@@ -1,8 +1,16 @@
+import 'dart:async';
+import 'dart:isolate';
+
+import 'package:easy_isolate/easy_isolate.dart';
 import 'package:flutter/material.dart';
+import 'package:pausable_timer/pausable_timer.dart';
 
 void main() {
   runApp(const MyApp());
 }
+
+late PausableTimer _timer;
+int _counter = 0;
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -47,18 +55,65 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+void mainHandler(dynamic data, SendPort isolateSendPort) {}
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
+void isolateHandler(
+    dynamic data, SendPort mainSendPort, SendErrorFunction onSendError) {
+  if (data == 'init') {
+    _updateCount() {
       _counter++;
+      print('Current counter value: $_counter');
+    }
+
+    void init() {
+      _timer = PausableTimer(const Duration(seconds: 1), () {
+        _timer
+          ..reset()
+          ..start();
+        _updateCount();
+      });
+      _timer.start();
+    }
+
+    init();
+  } else if (data == 'pause') {
+    _timer.pause();
+  } else if (data == 'resume') {
+    _timer.start();
+  }
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  bool flag = false;
+  late Worker worker;
+
+  _MyHomePageState();
+
+  _startInitialPolling() async {
+    print('Initial Polling Starting!!!');
+    setState(() {
+      flag = true;
     });
+    worker = Worker();
+    await worker.init(mainHandler, isolateHandler, initialMessage: 'init');
+  }
+
+  Future<void> _resumeAction() async {
+    _startPolling();
+  }
+
+  Future<void> _pauseAction() async {
+    _stopPolling();
+  }
+
+  void _startPolling() {
+    worker.sendMessage('resume');
+    print('Polling Resumed!!!');
+  }
+
+  void _stopPolling() {
+    worker.sendMessage('pause');
+    print('Polling Paused!!!');
   }
 
   @override
@@ -79,37 +134,35 @@ class _MyHomePageState extends State<MyHomePage> {
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              child: Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: flag ? _pauseAction : null,
+                    style: ElevatedButton.styleFrom(primary: Colors.blue[800]),
+                    child: const Text("Pause"),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: flag ? null : _startInitialPolling,
+                    style: ElevatedButton.styleFrom(primary: Colors.blue[800]),
+                    child: const Text("Start Polling"),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: flag ? _resumeAction : null,
+                    style: ElevatedButton.styleFrom(primary: Colors.blue[800]),
+                    child: const Text("Resume"),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
