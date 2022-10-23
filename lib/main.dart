@@ -9,9 +9,6 @@ void main() {
   runApp(const MyApp());
 }
 
-late PausableTimer _timer;
-int _counter = 0;
-
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -55,39 +52,41 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-void mainHandler(dynamic data, SendPort isolateSendPort) {}
-
-void isolateHandler(
-    dynamic data, SendPort mainSendPort, SendErrorFunction onSendError) {
-  if (data == 'init') {
-    _updateCount() {
-      _counter++;
-      print('Current counter value: $_counter');
-    }
-
-    void init() {
-      _timer = PausableTimer(const Duration(seconds: 1), () {
-        _timer
-          ..reset()
-          ..start();
-        _updateCount();
-      });
-      _timer.start();
-    }
-
-    init();
-  } else if (data == 'pause') {
-    _timer.pause();
-  } else if (data == 'resume') {
-    _timer.start();
-  }
-}
-
 class _MyHomePageState extends State<MyHomePage> {
   bool flag = false;
   late Worker worker;
+  static late PausableTimer _timer;
+  static int _counter = 0;
 
   _MyHomePageState();
+
+  void mainHandler(dynamic data, SendPort isolateSendPort) {}
+
+  static isolateHandler(
+      dynamic data, SendPort mainSendPort, SendErrorFunction onSendError) {
+    if (data == 'init') {
+      _updateCount() {
+        _counter++;
+        print('Current counter value: $_counter');
+      }
+
+      void init() {
+        _timer = PausableTimer(const Duration(seconds: 1), () {
+          _timer
+            ..reset()
+            ..start();
+          _updateCount();
+        });
+        _timer.start();
+      }
+
+      init();
+    } else if (data == 'pause') {
+      _timer.pause();
+    } else if (data == 'resume') {
+      _timer.start();
+    }
+  }
 
   _startInitialPolling() async {
     print('Initial Polling Starting!!!');
